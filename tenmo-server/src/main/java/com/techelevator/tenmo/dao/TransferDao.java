@@ -10,5 +10,7 @@ public interface TransferDao {
     String requestBucks(long userToId, long userFromId, BigDecimal amount);
     List<Transfer> getAllTransfer(long userId);
     Transfer getTransferById(long transferId);
-    String transferAcceptance(long transferId, int transferStatusId);
+    String transferAcceptance(long transferId);
+    List<Transfer> getPendingTransfers(long userId);
+    String transferRejection(long transferId);
 }

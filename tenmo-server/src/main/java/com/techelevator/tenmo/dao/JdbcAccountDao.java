@@ -6,10 +6,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.logging.Level;
 
+@Component
 public class JdbcAccountDao implements AccountDao{
     private final static String USER_ACCOUNT="select * from accounts where user_id=?";
     private final static String ACCOUNT_UPDATE= "UPDATE accounts SET balance=? WHERE account_id =?";

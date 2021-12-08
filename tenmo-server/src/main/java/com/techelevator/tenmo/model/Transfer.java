@@ -17,6 +17,22 @@ public class Transfer {
     public Transfer() {
     }
 
+    public void setUserFrom(String userFrom) {
+        this.userFrom = userFrom;
+    }
+
+    public void setUserTo(String userTo) {
+        this.userTo = userTo;
+    }
+
+    public void setTransfer_type_desc(String transfer_type_desc) {
+        this.transfer_type_desc = transfer_type_desc;
+    }
+
+    public void setTransfer_status_desc(String transfer_status_desc) {
+        this.transfer_status_desc = transfer_status_desc;
+    }
+
     public Transfer(long transfer_id, int transfer_type_id, int transfer_status_id, long account_to, long account_from, BigDecimal amount) {
         this.transfer_id = transfer_id;
         this.transfer_type_id = transfer_type_id;
