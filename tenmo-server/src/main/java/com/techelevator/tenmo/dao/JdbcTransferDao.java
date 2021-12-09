@@ -41,6 +41,7 @@ public class JdbcTransferDao implements TransferDao{
                         accountDao.findAccountByUserId(userToId).getAccount_id(), amount);
 
                 accountDao.receiveAmount(userToId, amount);
+                accountDao.sendAmount(userFromId, amount);
                 return "Transfer successfully complete.";
             } catch (DataAccessException e) {
 
@@ -85,15 +86,16 @@ public class JdbcTransferDao implements TransferDao{
         List<Transfer> transferList = new ArrayList<>();
 
         try {
-            String sql = "SELECT transfers.transfer_id, transfer_types.transfer_type_desc, " +
-                    "transfer_statuses.transfer_status_desc, transfers.account_from, transfers.account_to, transfers.amount " +
-                    "FROM transfers JOIN transfer_types ON transfer_types.transfer_type_id = transfers.transfer_type_id " +
-                    "JOIN transfer_statuses ON transfer_statuses.transfer_status_id = transfers.transfer_status_id " +
-                    "JOIN accounts ON accounts.account_id = transfers.account_from OR accounts.account_id = transfers.account_to " +
-                    "JOIN users ON users.user_id = accounts.user_id " +
-                    "WHERE users.user_id = ?";
+            String sql = "SELECT transfers.*, " +
+                    "s.username AS userFrom, r.username AS userTo, " +
+                    "JOIN accounts f ON f.account_id = transfers.account_from " +
+                    "JOIN accounts m ON m.account_id = transfers.account_to " +
+                    "JOIN users s ON s.user_id = f.user_id " +
+                    "JOIN users r ON r.user_id = m.user_id " +
+                    "WHERE s.user_id = ? " +
+                    "OR r.user_id = ?";
 
-            SqlRowSet result = jdbcTemplate.queryForRowSet(sql, userId);
+            SqlRowSet result = jdbcTemplate.queryForRowSet(sql, userId, userId);
 
             while(result.next()) {
                 Transfer transfer = rowMap(result);
@@ -111,12 +113,14 @@ public class JdbcTransferDao implements TransferDao{
 
     private Transfer rowMap(SqlRowSet result) {
         Transfer transfer = new Transfer();
-        transfer.setTransfer_id(result.getLong("transfers.transfer_id"));
-        transfer.setAmount(result.getBigDecimal("transfers.amount"));
-        transfer.setAccount_to(result.getLong("transfers.account_to"));
-        transfer.setAccount_from(result.getLong("transfers.account_from"));
-        transfer.setTransfer_type_desc(result.getString("transfer_types.transfer_type_desc"));
-        transfer.setTransfer_status_desc(result.getString("transfer_statuses.transfer_status_desc"));
+        transfer.setTransfer_id(result.getLong("transfer_id"));
+        transfer.setAmount(result.getBigDecimal("amount"));
+        transfer.setAccount_to(result.getLong("account_to"));
+        transfer.setAccount_from(result.getLong("account_from"));
+        transfer.setTransfer_type_desc(result.getString("type"));
+        transfer.setTransfer_status_desc(result.getString("status"));
+        transfer.setUserFrom(result.getString("userfrom"));
+        transfer.setUserTo(result.getString("userto"));
         return transfer;
     }
 
@@ -126,12 +130,14 @@ public class JdbcTransferDao implements TransferDao{
         Transfer transfer = null;
 
         try {
-            String sql = "SELECT transfers.transfer_id, transfer_types.transfer_type_desc, " +
-                    "transfer_statuses.transfer_status_desc, transfers.account_from, transfers.account_to, transfers.amount " +
+            String sql = "SELECT transfers.*, transfer_types.transfer_type_desc AS type, " +
+                    "transfer_statuses.transfer_status_desc AS status, s.username AS userFrom, r.username AS userTo, " +
                     "FROM transfers JOIN transfer_types ON transfer_types.transfer_type_id = transfers.transfer_type_id " +
                     "JOIN transfer_statuses ON transfer_statuses.transfer_status_id = transfers.transfer_status_id " +
-                    "JOIN accounts ON accounts.account_id = transfers.account_from OR accounts.account_id = transfers.account_to " +
-                    "JOIN users ON users.user_id = accounts.user_id " +
+                    "JOIN accounts f ON f.account_id = transfers.account_from " +
+                    "JOIN accounts m ON m.account_id = transfers.account_to " +
+                    "JOIN users s ON s.user_id = f.user_id " +
+                    "JOIN users r ON r.user_id = m.user_id " +
                     "WHERE transfers.transfer_id = ?";
 
             SqlRowSet result = jdbcTemplate.queryForRowSet(sql, transferId);
@@ -154,20 +160,34 @@ public class JdbcTransferDao implements TransferDao{
 
         if (transfer.getTransfer_type_id() == 1) {
             if (accountDao.findAccountById(transfer.getAccount_to()).getBalance().compareTo(transfer.getAmount()) == 1) {
-                String sql = "UPDATE transfers SET transfer_status_id = ? " +
-                        "WHERE transfer_id = ?";
+                try {
+                    String sql = "UPDATE transfers SET transfer_status_id = ? " +
+                            "WHERE transfer_id = ?";
 
-                jdbcTemplate.update(sql, 2, transferId);
+                    jdbcTemplate.update(sql, 2, transferId);
 
-                Accounts accounts = accountDao.findAccountById(transfer.getAccount_from());
-                BigDecimal newBalance = accounts.getBalance().add(transfer.getAmount());
-                accountDao.findAccountById(transfer.getAccount_from()).setBalance(newBalance);
+                    Accounts accounts = accountDao.findAccountById(transfer.getAccount_from());
+                    BigDecimal newBalance = accounts.getBalance().add(transfer.getAmount());
+                    accountDao.findAccountById(transfer.getAccount_from()).setBalance(newBalance);
 
-                Accounts account = accountDao.findAccountById(transfer.getAccount_to());
-                BigDecimal newBalanc = account.getBalance().subtract(transfer.getAmount());
-                accountDao.findAccountById(transfer.getAccount_to()).setBalance(newBalance);
+                    Accounts account = accountDao.findAccountById(transfer.getAccount_to());
+                    BigDecimal newBalanc = account.getBalance().subtract(transfer.getAmount());
+                    accountDao.findAccountById(transfer.getAccount_to()).setBalance(newBalance);
+
+                    return "Transfer Request Approved.";
+                } catch (DataAccessException e) {
+                    log.error("Error processing request.");
+                    e.printStackTrace();
+                    throw new RuntimeException(e);
+                }
             }
+            else
+                log.error("Insufficient funds.");
+                return "Insufficient funds: Unable to receive transfer.";
         }
+        else
+            log.warn("Not authorized.");
+            return "Only pending transactions can be updated.";
     }
 
     @Override
