@@ -1,9 +1,12 @@
 package com.techelevator.tenmo;
 
 import com.techelevator.tenmo.model.AuthenticatedUser;
+import com.techelevator.tenmo.model.Transfer;
 import com.techelevator.tenmo.model.UserCredentials;
+import com.techelevator.tenmo.services.AccountService;
 import com.techelevator.tenmo.services.AuthenticationService;
 import com.techelevator.tenmo.services.AuthenticationServiceException;
+import com.techelevator.tenmo.services.TransferService;
 import com.techelevator.view.ConsoleService;
 
 public class App {
@@ -25,6 +28,7 @@ private static final String API_BASE_URL = "http://localhost:8080/";
     private AuthenticatedUser currentUser;
     private ConsoleService console;
     private AuthenticationService authenticationService;
+
 
     public static void main(String[] args) {
     	App app = new App(new ConsoleService(System.in, System.out), new AuthenticationService(API_BASE_URL));
@@ -68,28 +72,26 @@ private static final String API_BASE_URL = "http://localhost:8080/";
 	}
 
 	private void viewCurrentBalance() {
-		// TODO Auto-generated method stub
-		
+		displayBalance();
 	}
 
 	private void viewTransferHistory() {
-		// TODO Auto-generated method stub
-		
+		displayAllTransfer();
 	}
 
 	private void viewPendingRequests() {
-		// TODO Auto-generated method stub
+		displayPendingTransfer();
 		
 	}
 
 	private void sendBucks() {
-		// TODO Auto-generated method stub
-		
+
+		send();
 	}
 
 	private void requestBucks() {
-		// TODO Auto-generated method stub
-		
+
+		request();
 	}
 	
 	private void exitProgram() {
@@ -151,4 +153,46 @@ private static final String API_BASE_URL = "http://localhost:8080/";
 		String password = console.getUserInput("Password");
 		return new UserCredentials(username, password);
 	}
+
+	private void displayBalance(){
+		AccountService accountService = new AccountService(API_BASE_URL,currentUser);
+		try{
+			accountService.getBalance();
+		}catch (NullPointerException e){
+			e.printStackTrace();
+			throw  new RuntimeException(e);
+		}
+	}
+
+	private void displayPendingTransfer(){
+		TransferService transferService = new TransferService(API_BASE_URL,currentUser);
+		try{
+			transferService.transfersRequestList();
+		}catch (NullPointerException e){
+			e.printStackTrace();
+			throw  new RuntimeException(e);
+		}
+	}
+
+	private void displayAllTransfer(){
+		TransferService transferService = new TransferService(API_BASE_URL,currentUser);
+		try{
+			transferService.transfersList();
+		}catch (NullPointerException e){
+			e.printStackTrace();
+			throw  new RuntimeException(e);
+		}
+	}
+
+	private void send(){
+		TransferService transferService = new TransferService(API_BASE_URL, currentUser);
+		transferService.sendBucks();
+	}
+
+	private void request(){
+		TransferService transferService = new TransferService(API_BASE_URL, currentUser);
+		transferService.requestBucks();
+	}
+
+	
 }

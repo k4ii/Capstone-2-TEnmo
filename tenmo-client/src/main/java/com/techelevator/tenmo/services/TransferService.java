@@ -10,137 +10,245 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.Scanner;
 
 public class TransferService {
-
-    private final String BASE_URL;
-    private AuthenticatedUser authenticatedUser;
+    private String BASE_URL;
     private RestTemplate restTemplate = new RestTemplate();
-    Scanner scanner = new Scanner(System.in);
+    private AuthenticatedUser currentUser;
 
-    public TransferService(String BASE_URL, AuthenticatedUser authenticatedUser) {
-        this.BASE_URL = BASE_URL;
-        this.authenticatedUser = authenticatedUser;
+    public TransferService(String url, AuthenticatedUser currentUser) {
+        this.currentUser = currentUser;
+        BASE_URL = url;
     }
 
-    public Transfer[] allTransfers() {
-        Transfer[] transfers = null;
-
+    public Transfer[] transfersList() {
+        Transfer [] output = null;
         try {
-            transfers = restTemplate.exchange(BASE_URL + "/account/transfer/" + authenticatedUser.getUser().getId(), HttpMethod.GET, makeAuthEntity(), Transfer[].class).getBody();
-
-            System.out.println("-----------------------------------------------");
-            System.out.println("Transfers");
-            System.out.println("ID            From/To                   Amount");
-            System.out.println("-----------------------------------------------");
-            String userFromOrTo = "";
-
-            for(Transfer transfer : transfers) {
-                if(authenticatedUser.getUser().getUsername().equals(transfer.getUserFrom())) {
-                    userFromOrTo = "From: " + transfer.getUserFrom();
+            output = restTemplate.exchange(BASE_URL + "account/transfers/" + currentUser.getUser().getId(), HttpMethod.GET, makeAuthEntity(), Transfer[].class).getBody();
+            System.out.println("-------------------------------------------\r\n" +
+                    "Transfers\r\n" +
+                    "ID          From/To                 Amount\r\n" +
+                    "-------------------------------------------\r\n");
+            String fromOrTo = "";
+            String name = "";
+            for (Transfer transfer : output) {
+                if (currentUser.getUser().getId() == transfer.getAccount_from()) {
+                    fromOrTo = "From: ";
+                    name = transfer.getUserTo();
                 } else {
-                    userFromOrTo = "To: " + transfer.getUserTo();
+                    fromOrTo = "To: ";
+                    name = transfer.getUserFrom();
                 }
-                System.out.println(transfer.getTransfer_id() + "\t \t" + userFromOrTo + "\t \t \t" + "$" + transfer.getAmount());
+                System.out.println(transfer.getTransfer_id() +"\t\t" + fromOrTo + name + "\t\t$" + transfer.getAmount());
             }
-
-            System.out.println("------------");
-            System.out.println("Please enter transfer ID to view details (0 to cancel): ");
+            System.out.print("-------------------------------------------\r\n" +
+                    "Please enter transfer ID to view details (0 to cancel): ");
+            Scanner scanner = new Scanner(System.in);
             String input = scanner.nextLine();
-
             if (Integer.parseInt(input) != 0) {
-                boolean isTransferIdExist = false;
-
-                for(Transfer transfer : transfers) {
-                    if (Integer.parseInt(input) == transfer.getTransfer_id()) {
-                        isTransferIdExist = true;
-
-                        Transfer transfer1 = restTemplate.exchange(BASE_URL + "/transfer/" + transfer.getTransfer_id(), HttpMethod.GET, makeAuthEntity(), Transfer.class).getBody();
-                        System.out.println("--------------------------------------------");
-                        System.out.println("Transfer Details");
-                        System.out.println("--------------------------------------------");
-                        System.out.println("Id: " + input);
-                        System.out.println("From: " + transfer1.getUserFrom());
-                        System.out.println("To: " + transfer1.getUserTo());
-                        System.out.println("Type: " + transfer1.getTransfer_type_desc());
-                        System.out.println("Status: " + transfer1.getTransfer_status_desc());
-                        System.out.println("Amount: $" + transfer1.getAmount());
-
+                boolean foundTransferId = false;
+                for (Transfer transfers : output) {
+                    if (Integer.parseInt(input) == transfers.getTransfer_id()) {
+                        Transfer temp = restTemplate.exchange(BASE_URL + "transfers/" + transfers.getTransfer_id(), HttpMethod.GET, makeAuthEntity(), Transfer.class).getBody();
+                        foundTransferId = true;
+                        System.out.println("--------------------------------------------\r\n" +
+                                "Transfer Details\r\n" +
+                                "--------------------------------------------\r\n" +
+                                " Id: "+ temp.getTransfer_id() + "\r\n" +
+                                " From: " + temp.getUserFrom() + "\r\n" +
+                                " To: " + temp.getUserTo() + "\r\n" +
+                                " Type: " + temp.getTransfer_type_desc() + "\r\n" +
+                                " Status: " + temp.getTransfer_status_desc() + "\r\n" +
+                                " Amount: $" + temp.getAmount());
                     }
-                    else {
-                        System.out.println("No transfer ID found.");
+                }
+                if (!foundTransferId) {
+                    System.out.println("Not a valid transfer ID");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Something went wrong... Opps! We have all your money now!");
+        }
+        return output;
+    }
+
+    public void sendBucks() {
+        Scanner scanner = new Scanner(System.in);
+        User[] users = null;
+        Transfer transfer = new Transfer();
+        try {
+
+            users = restTemplate.exchange(BASE_URL + "listusers", HttpMethod.GET, makeAuthEntity(), User[].class).getBody();
+            System.out.println("-------------------------------------------\r\n" +
+                    "Users\r\n" +
+                    "ID\t\tName\r\n" +
+                    "-------------------------------------------");
+            for (User i : users) {
+                if (i.getId() != currentUser.getUser().getId()) {
+                    System.out.println(i.getId() + "\t\t" + i.getUsername());
+                }
+            }
+            System.out.println("-------------------------------------------\r\n" +
+                    "Enter ID of user you are sending to (0 to cancel): ");
+            transfer.setAccount_to(Integer.parseInt(scanner.nextLine()));
+            transfer.setAccount_from(currentUser.getUser().getId());
+            if (transfer.getAccount_to() != 0) {
+                System.out.print("Enter amount: ");
+                try {
+                    transfer.setAmount(new BigDecimal(Double.parseDouble(scanner.nextLine())));
+                } catch (NumberFormatException e) {
+                    System.out.println("Error when entering amount");
+                }
+                String output = restTemplate.exchange(BASE_URL + "transfer", HttpMethod.POST, makeTransferEntity(transfer), String.class).getBody();
+                System.out.println(output);
+            }
+        } catch (Exception e) {
+            System.out.println("Bad input.");
+        }
+    }
+
+    public void requestBucks() {
+        User[] users = null;
+        Transfer transfer = new Transfer();
+        try {
+            Scanner scanner = new Scanner(System.in);
+            users = restTemplate.exchange(BASE_URL + "listusers", HttpMethod.GET, makeAuthEntity(), User[].class).getBody();
+            System.out.println("-------------------------------------------\r\n" +
+                    "Users\r\n" +
+                    "ID\t\tName\r\n" +
+                    "-------------------------------------------");
+            for (User i : users) {
+                if (i.getId() != currentUser.getUser().getId()) {
+                    System.out.println(i.getId() + "\t\t" + i.getUsername());
+                }
+            }
+            System.out.println("-------------------------------------------\r\n" +
+                    "Enter ID of user you are requesting from (0 to cancel): ");
+            transfer.setAccount_to(currentUser.getUser().getId());
+            transfer.setAccount_from(Integer.parseInt(scanner.nextLine()));
+            if (transfer.getAccount_to() != 0) {
+                System.out.print("Enter amount: ");
+                try {
+                    transfer.setAmount(new BigDecimal(Double.parseDouble(scanner.nextLine())));
+                } catch (NumberFormatException e) {
+                    System.out.println("Error when entering amount");
+                }
+                String output = restTemplate.exchange(BASE_URL + "request", HttpMethod.POST, makeTransferEntity(transfer), String.class).getBody();
+                System.out.println(output);
+            }
+        } catch (Exception e) {
+            System.out.println("Bad input.");
+        }
+    }
+
+    public Transfer[] transfersRequestList() {
+        Transfer [] output = null;
+        String results;
+        try {
+            output = restTemplate.exchange(BASE_URL + "request/" + currentUser.getUser().getId(), HttpMethod.GET, makeAuthEntity(), Transfer[].class).getBody();
+            System.out.println("-------------------------------------------\r\n" +
+                    "Pending Transfers\r\n" +
+                    "ID          From/To                 Amount\r\n" +
+                    "-------------------------------------------\r\n");
+            String fromOrTo = "";
+            String name = "";
+            for (Transfer transfer : output) {
+                if (currentUser.getUser().getId() == transfer.getAccount_from()) {
+                    fromOrTo = "From: ";
+                    name = transfer.getUserTo();
+                } else {
+                    fromOrTo = "To: ";
+                    name = transfer.getUserFrom();
+                }
+                System.out.println(transfer.getTransfer_id() +"\t\t" + fromOrTo + name + "\t\t$" + transfer.getAmount());
+            }
+            System.out.println("-------------------------------------------\r\n" +
+                    "Please enter transfer ID to approve/reject (0 to cancel): ");
+            Scanner scanner = new Scanner(System.in);
+            String input = scanner.nextLine();
+            if (Integer.parseInt(input) != 0) {
+                boolean foundTransferId = false;
+                for (Transfer transfer : output) {
+                    if (transfer.getTransfer_id() != currentUser.getUser().getId()) {
+                        if (Integer.parseInt(input) == transfer.getTransfer_id()) {
+                            System.out.print("-------------------------------------------\r\n" +
+                                    transfer.getTransfer_id() +"\t\t" + fromOrTo + name + "\t\t$" + transfer.getAmount() + "\r\n" +
+                                    "1: Approve\r\n" +
+                                    "2: Reject\r\n" +
+                                    "0: Don't approve or reject\r\n" +
+                                    "--------------------------\r\n" +
+                                    "Please choose an option: ");
+                            try {
+                                int id = 1 + Integer.parseInt(scanner.nextLine());
+                                if (id != 1) {
+                                    results = restTemplate.exchange(BASE_URL + "transfer/status/" + id, HttpMethod.PUT, makeTransferEntity(transfer), String.class).getBody();
+                                    System.out.println(results);
+                                    foundTransferId = true;
+                                }
+                            } catch (NumberFormatException e) {
+                                System.out.println("Not a valid transfer option");
+                            }
+                            if (!foundTransferId) {
+                                System.out.println("Not a valid transfer ID");
+                            }
+                        }
+                    } else {
+                        System.out.println("You can not approve/reject your own request.");
                     }
                 }
             }
-            //What to do when user chooses 0 to cancel?
-
-
-        } catch (ResourceAccessException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-
-        } catch (RestClientException e) {
-            e.getMessage();
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            System.out.println("Something went wrong... Opps! We have all your money now!");
         }
-        return transfers;
-
+        return output;
     }
 
-    public String sendBucks() {
-        User[] userArray = null;
-        Transfer transfer = new Transfer();
-
+    public User[] getUsers() {
+        User[] user = null;
         try {
-            userArray = restTemplate.exchange(BASE_URL + "/listUsers", HttpMethod.GET, makeAuthEntity(), User[].class).getBody();
-            System.out.println("-------------------------------------------");
-            System.out.println("Users");
-            System.out.println("ID" + "\t\t" + "Name");
-            System.out.println("-------------------------------------------");
-            for(User user : userArray) {
-                System.out.println(user.getId() + "\t\t" + user.getUsername());
+            user = restTemplate.exchange(BASE_URL + "listusers", HttpMethod.GET, makeAuthEntity(), User[].class).getBody();
+            for (User i : user) {
+                System.out.println(i);
             }
-            System.out.println("---------\n");
-            System.out.println("Enter ID of user you are sending to (0 to cancel):");
-            long inputID = scanner.nextLong();
-            if (inputID != authenticatedUser.getUser().getId()) {
-                System.out.println("Enter amount: ");
-                double amount = scanner.nextDouble();
-                BigDecimal amountToSend = new BigDecimal(amount);
-
-                transfer.setAmount(amountToSend);
-                transfer.setAccount_from(authenticatedUser.getUser().getId());
-
-                //Set/Get user ID in Transfer JDBC and Service
-                //transfer.setAccount_to();
-            }
-        } catch (ResourceAccessException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-
-        } catch (RestClientException e) {
-            e.getMessage();
-            throw new RuntimeException(e);
-
+        } catch (RestClientResponseException e) {
+            System.out.println("Error getting users");
         }
+        return user;
     }
 
-    private HttpEntity<Transfer> transferHttpEntity(Transfer transfer) {
+    private HttpEntity<Transfer> makeTransferEntity(Transfer transfer) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(authenticatedUser.getToken());
+        headers.setBearerAuth(currentUser.getToken());
         HttpEntity<Transfer> entity = new HttpEntity<>(transfer, headers);
         return entity;
     }
 
     private HttpEntity makeAuthEntity() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(authenticatedUser.getToken());
-        HttpEntity entity = new HttpEntity(headers);
+        headers.setBearerAuth(currentUser.getToken());
+        HttpEntity entity = new HttpEntity<>(headers);
         return entity;
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

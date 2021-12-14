@@ -3,6 +3,7 @@ package com.techelevator.tenmo.controller;
 
 import com.techelevator.tenmo.dao.AccountDao;
 import com.techelevator.tenmo.dao.UserDao;
+import com.techelevator.tenmo.model.Accounts;
 import com.techelevator.tenmo.model.User;
 import org.apache.coyote.Request;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,22 +20,25 @@ import java.util.List;
 @RestController
 @PreAuthorize("isAuthenticated()")
 public class AccountController {
-
     @Autowired
-    private AccountDao accountDao;
-
+    private AccountDao accountDAO;
     @Autowired
-    private UserDao userDao;
+    private UserDao userDAO;
 
-    @RequestMapping(path = "/balance/{id}", method = RequestMethod.GET)
-    public BigDecimal getBalance(@PathVariable long id) {
-        return accountDao.getBalance(id);
+    public AccountController(AccountDao accountDAO, UserDao userDAO) {
+        this.accountDAO = accountDAO;
+        this.userDAO = userDAO;
     }
 
-    @RequestMapping(path = "/listUsers", method = RequestMethod.GET)
-    public List<User> userList() {
-        return userDao.findAll();
+    @RequestMapping(path = "balance/{id}", method = RequestMethod.GET)
+    public BigDecimal getBalance(@PathVariable int id) {
+        BigDecimal balance = accountDAO.getBalance(id);
+        return balance;
     }
 
-
+    @RequestMapping(path = "listusers", method = RequestMethod.GET)
+    public List <User> listUsers() {
+        List <User> users = userDAO.findAll();
+        return users;
+    }
 }
