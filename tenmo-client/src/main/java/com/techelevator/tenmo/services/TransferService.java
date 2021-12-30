@@ -37,11 +37,11 @@ public class TransferService {
             String fromOrTo = "";
             String name = "";
             for (Transfer transfer : output) {
-                if (currentUser.getUser().getId() == transfer.getAccount_from()) {
-                    fromOrTo = "From: ";
+                if (currentUser.getUser().getUsername().equals(transfer.getUserFrom())) {
+                    fromOrTo = "to: ";
                     name = transfer.getUserTo();
                 } else {
-                    fromOrTo = "To: ";
+                    fromOrTo = "from: ";
                     name = transfer.getUserFrom();
                 }
                 System.out.println(transfer.getTransfer_id() +"\t\t" + fromOrTo + name + "\t\t$" + transfer.getAmount());
@@ -72,7 +72,7 @@ public class TransferService {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Something went wrong... Opps! We have all your money now!");
+           e.printStackTrace();
         }
         return output;
     }
@@ -150,7 +150,7 @@ public class TransferService {
         Transfer [] output = null;
         String results;
         try {
-            output = restTemplate.exchange(BASE_URL + "request/" + currentUser.getUser().getId(), HttpMethod.GET, makeAuthEntity(), Transfer[].class).getBody();
+            output = restTemplate.exchange(BASE_URL + "transfer/request/" + currentUser.getUser().getId(), HttpMethod.GET, makeAuthEntity(), Transfer[].class).getBody();
             System.out.println("-------------------------------------------\r\n" +
                     "Pending Transfers\r\n" +
                     "ID          From/To                 Amount\r\n" +
@@ -158,11 +158,11 @@ public class TransferService {
             String fromOrTo = "";
             String name = "";
             for (Transfer transfer : output) {
-                if (currentUser.getUser().getId() == transfer.getAccount_from()) {
-                    fromOrTo = "From: ";
+                if (currentUser.getUser().getUsername().equals(transfer.getUserFrom())) {
+                    fromOrTo = "to: ";
                     name = transfer.getUserTo();
                 } else {
-                    fromOrTo = "To: ";
+                    fromOrTo = "from: ";
                     name = transfer.getUserFrom();
                 }
                 System.out.println(transfer.getTransfer_id() +"\t\t" + fromOrTo + name + "\t\t$" + transfer.getAmount());
@@ -184,8 +184,8 @@ public class TransferService {
                                     "--------------------------\r\n" +
                                     "Please choose an option: ");
                             try {
-                                int id = 1 + Integer.parseInt(scanner.nextLine());
-                                if (id != 1) {
+                                int id = scanner.nextInt();
+                                if (id != 0) {
                                     results = restTemplate.exchange(BASE_URL + "transfer/status/" + id, HttpMethod.PUT, makeTransferEntity(transfer), String.class).getBody();
                                     System.out.println(results);
                                     foundTransferId = true;

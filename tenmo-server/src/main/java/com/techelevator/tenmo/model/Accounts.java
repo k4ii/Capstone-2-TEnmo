@@ -1,11 +1,17 @@
 package com.techelevator.tenmo.model;
 
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
+
+import javax.annotation.Generated;
 import java.math.BigDecimal;
 
 public class Accounts {
+
     private int user_id;
     private int account_id;
     private BigDecimal balance;
+
 
     public Accounts() {
     }

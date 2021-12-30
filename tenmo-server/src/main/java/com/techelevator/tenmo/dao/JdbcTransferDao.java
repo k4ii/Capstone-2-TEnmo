@@ -95,36 +95,46 @@ public class JdbcTransferDao implements TransferDao{
     @Override
     public List<Transfer> getPendingRequests(int userId) {
         List<Transfer> output = new ArrayList<>();
-        String sql = "SELECT t.*, u.username AS userFrom, v.username AS userTo FROM transfers t " +
+        List<Transfer> list = getAllTransfers(userId);
+        for(Transfer transfer:list){
+            if(transfer.getTransfer_status_id()==1){
+                output.add(transfer);
+            }
+        }
+        /*String sql = "SELECT t.*, u.username AS userFrom, v.username AS userTo FROM transfers t " +
                 "JOIN accounts a ON t.account_from = a.account_id " +
                 "JOIN accounts b ON t.account_to = b.account_id " +
                 "JOIN users u ON a.user_id = u.user_id " +
                 "JOIN users v ON b.user_id = v.user_id " +
-                "WHERE transfer_status_id = 1 AND (account_from = ? OR account_to = ?)";
-        SqlRowSet results = jdbcTemplate.queryForRowSet(sql, userId, userId);
+                "WHERE t.transfer_status_id =? AND (u.user_id = ? OR v.user_id = ?)";
+        SqlRowSet results = jdbcTemplate.queryForRowSet(sql,1, userId, userId);
         while (results.next()) {
             Transfer transfer = mapRowToTransfer(results);
             output.add(transfer);
-        }
+        }*/
         return output;
     }
 
     @Override
     public String updateTransferRequest(Transfer transfer, int statusId) {
-        if (statusId == 3) {
+        if (statusId == 2) {
             String sql = "UPDATE transfers SET transfer_status_id = ? WHERE transfer_id = ?;";
             jdbcTemplate.update(sql, statusId, transfer.getTransfer_id());
             return "Update successfully";
         }
-        if ((accountDAO.getBalance(transfer.getAccount_from())).compareTo(transfer.getAmount()) == 1) {
-            String sql = "UPDATE transfers SET transfer_status_id = ? WHERE transfer_id = ?;";
-            jdbcTemplate.update(sql, statusId, transfer.getTransfer_id());
-            accountDAO.addToBalance(transfer.getAmount(), transfer.getAccount_to());
-            accountDAO.subtractFromBalance(transfer.getAmount(), transfer.getAccount_from());
-            return "Update successful";
-        } else {
-            return "Insufficient funds for transfer";
-        }
+
+       if(statusId==1){
+           if ((accountDAO.getBalance(transfer.getAccount_from())).compareTo(transfer.getAmount()) == 1) {
+               String sql = "UPDATE transfers SET transfer_status_id = ? WHERE transfer_id = ?;";
+               jdbcTemplate.update(sql, statusId, transfer.getTransfer_id());
+               accountDAO.addToBalance(transfer.getAmount(), transfer.getAccount_to());
+               accountDAO.subtractFromBalance(transfer.getAmount(), transfer.getAccount_from());
+               return "Update successful";
+           } else {
+               return "Insufficient funds for transfer";
+           }
+       }
+       return " you didn't make a choice";
     }
 
     private Transfer mapRowToTransfer(SqlRowSet results) {
@@ -135,10 +145,19 @@ public class JdbcTransferDao implements TransferDao{
         transfer.setAccount_from(results.getInt("account_From"));
         transfer.setAccount_to(results.getInt("account_to"));
         transfer.setAmount(results.getBigDecimal("amount"));
-        transfer.setUserFrom(results.getString("userFrom"));
-        transfer.setUserTo(results.getString("userTo"));
-        transfer.setTransfer_type_desc(results.getString("transfer_type_desc"));
-        transfer.setTransfer_status_desc(results.getString("transfer_status_desc"));
+       try{
+           transfer.setUserFrom(results.getString("userFrom"));
+           transfer.setUserTo(results.getString("userTo"));
+       }catch (DataAccessException e){
+           e.printStackTrace();
+       }
+        try{
+            transfer.setTransfer_type_desc(results.getString("transfer_type_desc"));
+            transfer.setTransfer_status_desc(results.getString("transfer_status_desc"));
+        }catch (DataAccessException e){
+            e.printStackTrace();
+        }
+
 
         return transfer;
     }
